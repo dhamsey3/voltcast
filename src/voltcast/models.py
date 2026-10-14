@@ -13,7 +13,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 
-from dayahead.calendar import delivery_slots, wall_clock
+from voltcast.calendar import delivery_slots, wall_clock
 
 Prices = list[tuple[datetime, float]]
 History = Mapping[date, Prices]

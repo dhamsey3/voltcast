@@ -64,7 +64,7 @@ resource "aws_lambda_function" "pipeline" {
   role             = aws_iam_role.pipeline.arn
   runtime          = "python3.13"
   architectures    = ["arm64"]
-  handler          = "dayahead.handler.handler"
+  handler          = "voltcast.handler.handler"
   filename         = data.archive_file.lambda.output_path
   source_code_hash = data.archive_file.lambda.output_base64sha256
   memory_size      = 256
@@ -89,5 +89,5 @@ resource "aws_lambda_function" "pipeline" {
 }
 
 locals {
-  metrics_namespace = "DayAhead"
+  metrics_namespace = "Voltcast"
 }

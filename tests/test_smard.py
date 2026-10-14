@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from dayahead.calendar import local_date, wall_clock
-from dayahead.smard import DAY_AHEAD_PRICE_DE_LU, SmardClient, SmardUnavailable, _http_get, parse_points
+from voltcast.calendar import local_date, wall_clock
+from voltcast.smard import DAY_AHEAD_PRICE_DE_LU, SmardClient, SmardUnavailable, _http_get, parse_points
 
 FIXTURE = Path(__file__).parent / "fixtures" / "smard_4169_DE-LU_quarterhour_1791756000000.json"
 

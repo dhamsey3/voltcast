@@ -2,7 +2,7 @@ from datetime import UTC, date, datetime
 
 import pytest
 
-from dayahead.calendar import delivery_slots, wall_clock
+from voltcast.calendar import delivery_slots, wall_clock
 
 
 @pytest.mark.parametrize(

@@ -12,7 +12,7 @@ Results usually appear on SMARD around 14:00.
 ## run-failed
 
 A daily run failed or timed out. Open the failed execution in the Step
-Functions console (state machine `dayahead-daily`) and read the error on the
+Functions console (state machine `voltcast-daily`) and read the error on the
 failing state.
 
 | Error | What it means | Do this |
@@ -21,7 +21,7 @@ failing state.
 | `ContractViolation` | data arrived but breaks the contract | **Don't force it through.** Look at the message (which day, which check). Compare with smard.de. If the auction limits changed, update `PRICE_FLOOR`/`PRICE_CAP` in a PR. Record an incident. |
 | `TooLate` | a forecast run started after gate closure | The scheduler fired late or someone re-ran it by hand. Nothing to publish. Score as normal. |
 | `SmardUnavailable` | network or bad response after retries | Usually transient. Re-run. |
-| anything else | a bug | Reproduce locally with `python -m dayahead --store s3://<bucket> ...`, fix, deploy, re-run. |
+| anything else | a bug | Reproduce locally with `python -m voltcast --store s3://<bucket> ...`, fix, deploy, re-run. |
 
 ## forecast-missing
 
@@ -43,7 +43,7 @@ aws stepfunctions start-execution --state-machine-arn "$(terraform -chdir=infras
 Run one step for a specific day, for example re-scoring:
 
 ```bash
-aws lambda invoke --function-name dayahead-pipeline --payload '{"step":"score","delivery_date":"2026-10-16"}' out.json
+aws lambda invoke --function-name voltcast-pipeline --payload '{"step":"score","delivery_date":"2026-10-16"}' out.json
 ```
 
 With AWS CLI v2, add `--cli-binary-format raw-in-base64-out`.
@@ -51,7 +51,7 @@ With AWS CLI v2, add `--cli-binary-format raw-in-base64-out`.
 Champion vs challenger over the last 30 days, straight from the bucket:
 
 ```bash
-.venv/bin/python -m dayahead --store "s3://$(terraform -chdir=infrastructure output -raw data_bucket)" report --days 30
+.venv/bin/python -m voltcast --store "s3://$(terraform -chdir=infrastructure output -raw data_bucket)" report --days 30
 ```
 
 Promote a model: open a PR that swaps `champion`/`challengers` in

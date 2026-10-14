@@ -24,4 +24,5 @@ schedule around price. Finally, its data is local, open and arrives daily.
 
 - The evidence is a track record (uptime, accuracy over time, incidents), not a notebook.
 - Drift, late data, source revisions and clock changes are real problems to handle, not simulations.
-- The repo name no longer matches; renaming is cosmetic and can wait.
+- The repo started as `aws-mlops-predictive-maintenance`. It was renamed to
+  `voltcast` before the first deploy, so no state or resource had to move.

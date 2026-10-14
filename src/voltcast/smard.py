@@ -14,10 +14,10 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from dayahead.calendar import from_ms, to_ms
+from voltcast.calendar import from_ms, to_ms
 
 BASE_URL = "https://www.smard.de/app/chart_data"
-USER_AGENT = "dayahead-forecaster/0.1 (+https://github.com/dhamsey3/aws-mlops-predictive-maintenance)"
+USER_AGENT = "voltcast/0.1 (+https://github.com/dhamsey3/voltcast)"
 
 
 class SmardUnavailable(Exception):

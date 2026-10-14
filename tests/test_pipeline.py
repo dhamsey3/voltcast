@@ -4,10 +4,10 @@ from datetime import UTC, date, datetime, timedelta
 import pytest
 
 from conftest import FakeSmard, default_price
-from dayahead.calendar import next_auction_day
-from dayahead.contract import ContractViolation, InputsNotReady, TooLate
-from dayahead.pipeline import backfill, check_published, forecast, ingest, report, score
-from dayahead.store import keys
+from voltcast.calendar import next_auction_day
+from voltcast.contract import ContractViolation, InputsNotReady, TooLate
+from voltcast.pipeline import backfill, check_published, forecast, ingest, report, score
+from voltcast.store import keys
 
 TODAY = date(2026, 10, 14)
 TOMORROW = TODAY + timedelta(days=1)

@@ -2,8 +2,8 @@ from datetime import date, timedelta
 
 import pytest
 
-from dayahead.calendar import delivery_slots
-from dayahead.contract import ContractViolation, check_day, is_complete
+from voltcast.calendar import delivery_slots
+from voltcast.contract import ContractViolation, check_day, is_complete
 
 DAY = date(2026, 10, 14)
 

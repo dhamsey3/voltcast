@@ -1,0 +1,18 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.DS_Store
+
+# local pipeline state and Lambda build output
+data/
+build/
+
+# Terraform
+infrastructure/.terraform/
+infrastructure/*.tfstate*
+infrastructure/terraform.tfvars
+infrastructure/backend.hcl
+infrastructure/tfplan
+*.egg-info/

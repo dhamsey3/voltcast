@@ -1,509 +1,163 @@
-# AWS MLOps Predictive Maintenance
+# Day-ahead power price forecaster (Germany/Luxembourg)
 
-An end-to-end MLOps project on AWS for training, registering, deploying, and monitoring a predictive maintenance machine learning model.
+Every morning this service forecasts tomorrow's electricity price for each of
+the 96 quarter-hours of the German/Luxembourg day-ahead auction. It publishes
+the forecast before the auction closes at 12:00. That afternoon it grades
+itself against the cleared prices. It runs unattended on AWS, raises an alert
+when it misses a promise, and keeps the evidence behind every number it
+publishes.
 
-## Goal
+> The repo name is historical. This started as a predictive-maintenance plan on
+> a synthetic dataset and became a live service on real data. See
+> [ADR 1](docs/adr/0001-live-forecasting-service.md).
 
-Build a production-style ML platform that demonstrates the full machine learning lifecycle:
+## Why this problem
 
-**Data → Preprocessing → Training → Evaluation → Model Registry → Approval → Deployment → Monitoring**
+The day-ahead auction sets the price of every 15-minute slot of the next day.
+Prices swing widely within a day: the first live forecast (16 Oct 2026) ranges
+from 89 to 270 EUR/MWh. Over the last year, 5.6% of slots cleared below zero.
+Factories, battery operators, EV fleets and households on dynamic tariffs move
+consumption to cheap slots, and traders bid on these forecasts.
 
-The focus of this project is not only model accuracy, but also infrastructure automation, reproducibility, security, CI/CD, model versioning, and monitoring.
+The data is open ([SMARD](https://www.smard.de), Bundesnetzagentur), and the
+true answer arrives every day. The model is graded daily, not once in a
+notebook.
 
-## Planned Architecture
+## What it promises
+
+| Promise | Target | Enforced by |
+|---|---|---|
+| Tomorrow's forecast is published | by 10:15 Berlin, daily | deadline check → `forecast-missing` alarm |
+| Every forecast is scored | same afternoon | `run-failed` alarm if scoring gives up |
+| Bad upstream data is never used | always | [data contract](docs/adr/0005-data-contract.md) stops the run |
+| No hindsight forecasts | always | live forecasts after the 12:00 gate closure are refused |
+| Cost | about 2 USD/month | AWS bill (estimate until deployed) |
+
+## How a day runs
+
+```mermaid
+sequenceDiagram
+    participant S as EventBridge Scheduler<br/>(Europe/Berlin)
+    participant F as Step Functions<br/>daily run
+    participant L as Lambda<br/>(dayahead)
+    participant D as SMARD
+    participant B as S3<br/>(versioned, KMS)
+    S->>F: 09:00 {"job": "forecast"}
+    F->>L: ingest
+    L->>D: weekly price chunks
+    L->>B: raw snapshot + curated days (contract-checked)
+    F->>L: forecast: champion + challengers
+    L->>B: forecasts/ and published/
+    Note over F,L: InputsNotReady → wait 15 min, re-ingest, retry
+    S->>L: 10:15 deadline check → ForecastMissing metric
+    Note over D: 12:00 auction closes · results ~14:00
+    S->>F: 14:30 {"job": "score"}
+    F->>L: ingest, then score
+    L->>B: scores/ + MAE metric per model
+```
+
+Why it's built this way, rather than with a SageMaker endpoint and Model
+Monitor, is covered in [ADR 2](docs/adr/0002-daily-batch-not-endpoint.md) and
+[ADR 4](docs/adr/0004-serverless-orchestration.md).
+
+## Models: champion and challengers
+
+Every model runs every day. The **champion's** forecast is published; the
+**challengers** run in shadow and are scored the same way. Phase 1 has no
+machine learning on purpose: these baselines are the bar any learned model has
+to clear ([ADR 3](docs/adr/0003-naive-models-first.md)).
+
+Replay over every day since the auction moved to 15-minute products
+(2025-10-01 to 2026-10-15, 380 days):
+
+| Model | Rule | MAE (EUR/MWh) | RMSE |
+|---|---|---|---|
+| **`naive_1d`** (champion) | same slot, most recent published day | **30.75** | **40.66** |
+| `seasonal_naive_7d` | same slot, same weekday last week | 38.58 | 49.34 |
+
+Promoting a model means a reviewed PR that changes the `champion` Terraform
+variable, with `dayahead report` output as the evidence.
+
+## Lineage
+
+Every forecast records its model and version, the git SHA of the code, the
+time it was made, and the S3 key and sha256 of every input day it read. The
+bucket is versioned, so a source revision never silently overwrites history.
+Any published number can be traced back to the exact bytes it came from.
+
+## Repository
 
 ```text
-GitHub
-  |
-  | CI/CD
-  v
-Terraform
-  |
-  v
-AWS Infrastructure
-  |
-  +--> S3
-  |     |
-  |     +--> raw/
-  |     +--> processed/
-  |     +--> model-artifacts/
-  |
-  +--> SageMaker Processing
-  |
-  +--> SageMaker Training
-  |
-  +--> SageMaker Model Registry
-  |       |
-  |       +--> Model v1
-  |       +--> Model v2
-  |       +--> Model v3
-  |
-  +--> SageMaker Endpoint
-  |
-  +--> SageMaker Model Monitor
-  |
-  +--> CloudWatch
+src/dayahead/
+  calendar.py   Berlin delivery days, 92/96/100 slots, gate closure
+  smard.py      SMARD client (weekly chunks, no API key)
+  contract.py   the data contract: missing waits, wrong stops
+  models.py     champion/challenger models
+  pipeline.py   ingest, forecast, score, check, backfill, report
+  handler.py    Lambda entry point
+  __main__.py   CLI for local runs and backfills
+tests/          41 tests, incl. both clock-change days and a real SMARD chunk
+infrastructure/ Terraform: S3+KMS, Lambda, Step Functions, Scheduler, alarms
+docs/
+  adr/          why things are the way they are
+  runbook.md    what to do when an alarm fires
+  incidents/    write-ups of every missed promise
 ```
 
-## Project Objectives
+## Run it locally
 
-### 1. Infrastructure with Terraform
-
-Provision the AWS infrastructure using Terraform.
-
-Resources should include:
-
-* S3 buckets or prefixes for raw data, processed data, and model artifacts
-* SageMaker IAM roles
-* SageMaker resources
-* ECR repository if a custom training or inference container is used
-* CloudWatch monitoring
-* KMS encryption where appropriate
-* Networking and VPC configuration if required
-
-Use least-privilege IAM policies.
-
----
-
-### 2. Dataset
-
-Use a public predictive-maintenance or equipment-failure dataset.
-
-Example problem:
-
-> Predict whether a machine is likely to fail based on sensor measurements such as temperature, pressure, rotational speed, vibration, or equipment usage.
-
-Store the original dataset in:
-
-```text
-s3://<bucket>/raw/
+```bash
+make setup      # Python 3.13 venv + dev tools
+make test       # unit tests
+make backfill   # replay every day since 2025-10-01 from real SMARD data (~30 s)
+make report     # champion vs challenger
+.venv/bin/python -m dayahead forecast   # forecast the next open auction
 ```
 
-Processed data should be stored separately:
+State goes to `./data` (gitignored), laid out exactly as in the S3 bucket.
 
-```text
-s3://<bucket>/processed/
+## Deploy
+
+Prerequisites: the shared Terraform state bucket and lock table from
+`aws-oidc-bootstrap`, plus AWS credentials for the target account.
+
+```bash
+cp infrastructure/backend.hcl.example infrastructure/backend.hcl         # fill in the account ID
+cp infrastructure/terraform.tfvars.example infrastructure/terraform.tfvars  # set alert_email
+make plan       # builds the Lambda bundle, then terraform plan
+make deploy     # applies the reviewed plan
 ```
 
----
-
-### 3. Data Processing
-
-Use SageMaker Processing to:
-
-* clean the dataset
-* handle missing values
-* encode categorical variables
-* create features
-* split data into training, validation, and test sets
-* upload processed datasets to S3
-
-Processing code should live under:
-
-```text
-src/preprocessing/
-```
-
----
-
-### 4. Model Training
-
-Train a classification model using SageMaker.
-
-Possible algorithms:
-
-* XGBoost
-* Random Forest
-* LightGBM
-* Logistic Regression
-
-Start simple.
-
-The training job should:
-
-* read training data from S3
-* train the model
-* calculate relevant metrics
-* save the model artifact to S3
-
-Possible metrics:
-
-* precision
-* recall
-* F1 score
-* ROC-AUC
-
----
-
-### 5. Experiment Tracking
-
-Initially use SageMaker experiments or training-job metadata.
-
-Later add MLflow to track:
-
-* parameters
-* metrics
-* experiments
-* artifacts
-* model runs
-
----
-
-### 6. Model Evaluation
-
-Create an evaluation step after training.
-
-The pipeline should determine whether the candidate model meets an agreed threshold.
-
-Example:
-
-```text
-F1 >= 0.85
-```
-
-If the model does not meet the threshold:
-
-```text
-Training
-   |
-Evaluation
-   |
-   +--> FAIL --> Stop
-```
-
-If it passes:
-
-```text
-Training
-   |
-Evaluation
-   |
-   +--> PASS --> Model Registry
-```
-
----
-
-### 7. SageMaker Model Registry
-
-Create a model package group such as:
-
-```text
-PredictiveMaintenanceModel
-```
-
-Register successful models as different versions.
-
-Example:
-
-```text
-PredictiveMaintenanceModel
-
-Version 1
-  F1: 0.81
-  Status: Rejected
-
-Version 2
-  F1: 0.87
-  Status: Approved
-
-Version 3
-  F1: 0.89
-  Status: PendingManualApproval
-```
-
-Store model metadata and evaluation metrics with each model version.
-
----
-
-### 8. Model Approval
-
-Use a model approval workflow.
-
-Models should initially be registered as:
-
-```text
-PendingManualApproval
-```
-
-Only approved models should be eligible for production deployment.
-
----
-
-### 9. Model Deployment
-
-Deploy an approved model to a SageMaker endpoint.
-
-Create an inference API that accepts sensor values and returns something similar to:
-
-```json
-{
-  "failure_probability": 0.87,
-  "prediction": "failure"
-}
-```
-
-Containerise custom inference code with Docker if needed.
-
----
-
-### 10. CI/CD
-
-Use GitHub Actions.
-
-Create separate workflows for:
-
-```text
-terraform.yml
-training.yml
-deployment.yml
-```
-
-The pipeline should eventually support:
-
-```text
-Git Push
-   |
-Tests
-   |
-Terraform Validate
-   |
-Build
-   |
-Train
-   |
-Evaluate
-   |
-Register Model
-   |
-Approve Model
-   |
-Deploy
-```
-
-Production deployment should require an approved model.
-
----
-
-### 11. Testing
-
-Add automated tests for:
-
-* preprocessing
-* feature transformations
-* training code
-* inference
-* Terraform
-* API input validation
-
-Suggested structure:
-
-```text
-tests/
-├── test_preprocessing.py
-├── test_training.py
-└── test_inference.py
-```
-
----
-
-### 12. Model Monitoring
-
-Enable SageMaker Model Monitor.
-
-Monitor:
-
-* input-data distribution
-* prediction distribution
-* model quality
-* endpoint latency
-* endpoint errors
-* data drift
-
-Use CloudWatch for infrastructure and application metrics.
-
----
-
-### 13. Drift Simulation
-
-Generate synthetic production data that differs from the training distribution.
-
-Example:
-
-```text
-Training
-
-temperature mean: 70
-vibration mean:   0.30
-```
-
-Later:
-
-```text
-Production
-
-temperature mean: 92
-vibration mean:   0.65
-```
-
-Use this to demonstrate how model monitoring detects drift.
-
----
-
-### 14. Security
-
-Implement:
-
-* least-privilege IAM
-* encrypted S3 storage
-* KMS where appropriate
-* restricted access to training datasets
-* separate SageMaker execution roles
-* private networking where practical
-
-Possible roles:
-
-```text
-SageMakerProcessingRole
-SageMakerTrainingRole
-SageMakerInferenceRole
-```
-
-Each role should only have access to the resources it requires.
-
----
-
-## Repository Structure
-
-```text
-aws-mlops-predictive-maintenance/
-│
-├── infrastructure/
-│   ├── modules/
-│   │   ├── iam/
-│   │   ├── s3/
-│   │   ├── sagemaker/
-│   │   └── monitoring/
-│   ├── main.tf
-│   ├── variables.tf
-│   └── outputs.tf
-│
-├── src/
-│   ├── preprocessing/
-│   ├── training/
-│   ├── evaluation/
-│   └── inference/
-│
-├── pipelines/
-│   └── sagemaker_pipeline.py
-│
-├── docker/
-│   └── Dockerfile
-│
-├── tests/
-│
-├── scripts/
-│
-├── .github/
-│   └── workflows/
-│       ├── terraform.yml
-│       ├── training.yml
-│       └── deployment.yml
-│
-├── requirements.txt
-├── Makefile
-└── README.md
-```
-
-## Implementation Phases
-
-### Phase 1 — Basic ML
-
-* choose dataset
-* perform exploratory analysis
-* create preprocessing pipeline
-* train baseline model locally
-* evaluate model
-
-### Phase 2 — AWS Training
-
-* upload data to S3
-* provision IAM with Terraform
-* run SageMaker Processing
-* run SageMaker Training
-* store model artifacts in S3
-
-### Phase 3 — MLOps Pipeline
-
-* create SageMaker Pipeline
-* add evaluation step
-* register successful models
-* implement Model Registry
-* implement model approval
-
-### Phase 4 — Deployment
-
-* create inference code
-* deploy approved model
-* expose SageMaker endpoint
-* test predictions
-
-### Phase 5 — CI/CD
-
-* automate testing
-* automate Terraform validation
-* automate training
-* automate model registration
-* automate deployment
-
-### Phase 6 — Monitoring
-
-* enable SageMaker Model Monitor
-* configure CloudWatch
-* simulate drift
-* create alerts
-
-### Phase 7 — Improvements
-
-Possible later additions:
-
-* MLflow
-* EKS-based inference
-* blue/green deployment
-* canary deployment
-* automated retraining
-* EventBridge triggers
-* Step Functions
-* feature store
-* multiple environments: dev/staging/prod
-* cost monitoring
-
-## Skills Demonstrated
-
-This project should demonstrate experience with:
-
-* AWS
-* Amazon SageMaker
-* SageMaker Model Registry
-* SageMaker Pipelines
-* SageMaker Model Monitor
-* Amazon S3
-* Amazon ECR
-* IAM
-* CloudWatch
-* Terraform
-* Python
-* Docker
-* GitHub Actions
-* CI/CD
-* ML model training
-* ML model deployment
-* model versioning
-* model monitoring
-* data drift
-* MLOps architecture
-
-## Final Goal
-
-The final project should make it possible to explain the following in an interview:
-
-> I built an end-to-end MLOps platform on AWS using Terraform, SageMaker, Python, Docker, and CI/CD. The system processes training data, trains and evaluates models, registers model versions in SageMaker Model Registry, requires approval before deployment, deploys approved models to SageMaker endpoints, and monitors the deployed model for operational issues and data drift.
+Confirm the SNS subscription email. The first scheduled run is the next 09:00
+Berlin.
+
+## Operating it
+
+- [Runbook](docs/runbook.md): what each alarm means and what to do
+- [Incidents](docs/incidents/README.md): every missed promise, written up
+- [Decisions](docs/adr/): ADRs 1 to 5
+
+## Roadmap
+
+1. **Live baseline service.** Built; next step is deploying it.
+2. **Deploy from CI, public status page.** GitHub Actions deploys through OIDC (role
+   in `aws-oidc-bootstrap`). A public page shows the latest forecast against the
+   cleared price, rolling error and model version, plus a monthly report with the real AWS bill.
+3. **First learned model.** Features from ENTSO-E (load, wind and solar forecasts) and DWD
+   weather. Trained on SageMaker and registered in the Model Registry with
+   lineage. The approval gate: beat the champion over 30 days in shadow.
+4. **Monitoring beyond accuracy.** Input drift, error by regime (negative-price
+   and scarcity hours), and a retraining trigger.
+5. **Second market.** Switzerland (CH) day-ahead prices.
+
+## Limitations
+
+- The baselines repeat recent prices. They will miss spikes and regime changes by design.
+- The numbers above are a replay, not a live record. The live record starts on deploy day
+  and is reported separately (`live_days`).
+- One account, one region, one environment.
+
+## Data
+
+Day-ahead prices: Bundesnetzagentur | SMARD.de, licensed
+[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

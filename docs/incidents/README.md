@@ -6,7 +6,7 @@ and focused on what changes so it can't happen the same way again.
 
 | Date | Summary | Impact | Write-up |
 |---|---|---|---|
-| | *No incidents yet. The service isn't deployed.* | | |
+| | *No incidents yet. Live since 2026-10-14.* | | |
 
 ## Template
 

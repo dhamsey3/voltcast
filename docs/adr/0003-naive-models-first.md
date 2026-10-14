@@ -38,7 +38,7 @@ changes. That gives a natural next challenger: a day-type-aware naive model.
 ## Consequences
 
 - Promotion is a reviewed change to the `champion` / `challengers` Terraform
-  variables, with `python -m dayahead report` output attached to the PR.
+  variables, with `python -m voltcast report` output attached to the PR.
 - These numbers are a replay. The live track record starts on the first
   deployed day and is reported separately (`live_days` in the report).
 - Any future ML model has a clear bar to clear: ~31 EUR/MWh MAE.

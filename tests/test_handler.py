@@ -4,9 +4,9 @@ from datetime import UTC, date, datetime, timedelta
 import pytest
 
 from conftest import FakeSmard
-from dayahead import handler as lambda_handler
-from dayahead.contract import TooLate
-from dayahead.store import LocalStore, keys
+from voltcast import handler as lambda_handler
+from voltcast.contract import TooLate
+from voltcast.store import LocalStore, keys
 
 TODAY = date(2026, 10, 14)
 
@@ -15,7 +15,7 @@ TODAY = date(2026, 10, 14)
 def lambda_env(tmp_path, monkeypatch):
     smard = FakeSmard(TODAY - timedelta(days=21), TODAY + timedelta(days=1), published_until=TODAY)
     monkeypatch.setenv("DATA_STORE", str(tmp_path))
-    monkeypatch.setenv("AWS_LAMBDA_FUNCTION_NAME", "dayahead-pipeline")
+    monkeypatch.setenv("AWS_LAMBDA_FUNCTION_NAME", "voltcast-pipeline")
     monkeypatch.setattr(lambda_handler, "SmardClient", smard.client)
 
     class Frozen(datetime):
@@ -35,7 +35,7 @@ def test_daily_forecast_run(lambda_env, capsys):
 
     emitted = [json.loads(line) for line in capsys.readouterr().out.splitlines() if line.startswith("{")]
     assert {k: v for k, v in emitted[-1].items() if k == "ForecastPublished"} == {"ForecastPublished": 1}
-    assert emitted[-1]["_aws"]["CloudWatchMetrics"][0]["Namespace"] == "DayAhead"
+    assert emitted[-1]["_aws"]["CloudWatchMetrics"][0]["Namespace"] == "Voltcast"
 
 
 def test_deadline_check_emits_missing_metric(lambda_env, capsys):

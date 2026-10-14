@@ -16,10 +16,10 @@ import logging
 import os
 from datetime import UTC, date, datetime, timedelta
 
-from dayahead.calendar import berlin_today, next_auction_day, parse_iso
-from dayahead.pipeline import Settings, check_published, forecast, ingest, score
-from dayahead.smard import SmardClient
-from dayahead.store import open_store
+from voltcast.calendar import berlin_today, next_auction_day, parse_iso
+from voltcast.pipeline import Settings, check_published, forecast, ingest, score
+from voltcast.smard import SmardClient
+from voltcast.store import open_store
 
 logging.getLogger().setLevel(logging.INFO)
 

@@ -15,7 +15,7 @@ be hindsight, and it would flatter the track record.
 
 ## Decision
 
-The contract for one delivery day (`src/dayahead/contract.py`):
+The contract for one delivery day (`src/voltcast/contract.py`):
 
 - Exactly the 15-minute slots of the Berlin day: 96, or **92 / 100** on clock-change days.
 - No duplicate timestamps, nothing off the 15-minute grid.

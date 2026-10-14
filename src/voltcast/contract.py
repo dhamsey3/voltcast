@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from dayahead.calendar import delivery_slots, iso
+from voltcast.calendar import delivery_slots, iso
 
 # SDAC harmonised minimum/maximum clearing prices (EUR/MWh) at the time of
 # writing. A value outside this range means the data is wrong, or the limits

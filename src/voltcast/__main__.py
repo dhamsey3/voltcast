@@ -1,9 +1,9 @@
 """Command line for local runs, backfills and reports.
 
-    python -m dayahead ingest
-    python -m dayahead forecast --date 2026-10-16
-    python -m dayahead backfill --start 2026-09-01 --end 2026-10-14
-    python -m dayahead report --days 30
+    python -m voltcast ingest
+    python -m voltcast forecast --date 2026-10-16
+    python -m voltcast backfill --start 2026-09-01 --end 2026-10-14
+    python -m voltcast report --days 30
 
 ``--store`` takes a local folder (default ./data) or s3://bucket.
 """
@@ -16,14 +16,14 @@ import logging
 import os
 from datetime import UTC, date, datetime, timedelta
 
-from dayahead.calendar import berlin_today, next_auction_day
-from dayahead.pipeline import Settings, backfill, check_published, forecast, ingest, report, score
-from dayahead.smard import SmardClient
-from dayahead.store import open_store
+from voltcast.calendar import berlin_today, next_auction_day
+from voltcast.pipeline import Settings, backfill, check_published, forecast, ingest, report, score
+from voltcast.smard import SmardClient
+from voltcast.store import open_store
 
 
 def main(argv: list[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(prog="dayahead")
+    parser = argparse.ArgumentParser(prog="voltcast")
     parser.add_argument("--store", default=os.environ.get("DATA_STORE", "data"))
     sub = parser.add_subparsers(dest="command", required=True)
 

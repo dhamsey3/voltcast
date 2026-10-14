@@ -23,7 +23,7 @@ def emit(metrics: dict[str, float], dimensions: dict[str, str] | None = None) ->
                     "Timestamp": int(time.time() * 1000),
                     "CloudWatchMetrics": [
                         {
-                            "Namespace": os.environ.get("METRICS_NAMESPACE", "DayAhead"),
+                            "Namespace": os.environ.get("METRICS_NAMESPACE", "Voltcast"),
                             "Dimensions": [list(dimensions)],
                             "Metrics": [{"Name": name} for name in metrics],
                         }

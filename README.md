@@ -1,15 +1,12 @@
-# Day-ahead power price forecaster (Germany/Luxembourg)
+# voltcast
 
-Every morning this service forecasts tomorrow's electricity price for each of
-the 96 quarter-hours of the German/Luxembourg day-ahead auction. It publishes
-the forecast before the auction closes at 12:00. That afternoon it grades
-itself against the cleared prices. It runs unattended on AWS, raises an alert
-when it misses a promise, and keeps the evidence behind every number it
-publishes.
+**Live day-ahead electricity price forecasts for Germany/Luxembourg, run as a service on AWS.**
 
-> The repo name is historical. This started as a predictive-maintenance plan on
-> a synthetic dataset and became a live service on real data. See
-> [ADR 1](docs/adr/0001-live-forecasting-service.md).
+Every morning voltcast forecasts tomorrow's electricity price for each of the
+96 quarter-hours of the German/Luxembourg day-ahead auction. It publishes the
+forecast before the auction closes at 12:00. That afternoon it grades itself
+against the cleared prices. It runs unattended on AWS, raises an alert when it
+misses a promise, and keeps the evidence behind every number it publishes.
 
 ## Why this problem
 
@@ -31,7 +28,14 @@ notebook.
 | Every forecast is scored | same afternoon | `run-failed` alarm if scoring gives up |
 | Bad upstream data is never used | always | [data contract](docs/adr/0005-data-contract.md) stops the run |
 | No hindsight forecasts | always | live forecasts after the 12:00 gate closure are refused |
-| Cost | about 2 USD/month | AWS bill (estimate until deployed) |
+| Cost | about 2 USD/month | AWS bill (estimate until the first full month) |
+
+## Architecture
+
+![voltcast architecture on AWS: EventBridge Scheduler starts a Step Functions daily run that drives one Lambda; the Lambda pulls prices from SMARD and keeps all state in a versioned, KMS-encrypted S3 bucket; CloudWatch alarms notify on-call through SNS](docs/architecture.png)
+
+Source: [`docs/architecture.drawio`](docs/architecture.drawio), drawn with draw.io's
+AWS icon set. After editing it, run `make diagram` to re-export the image.
 
 ## How a day runs
 
@@ -39,7 +43,7 @@ notebook.
 sequenceDiagram
     participant S as EventBridge Scheduler<br/>(Europe/Berlin)
     participant F as Step Functions<br/>daily run
-    participant L as Lambda<br/>(dayahead)
+    participant L as Lambda<br/>(voltcast)
     participant D as SMARD
     participant B as S3<br/>(versioned, KMS)
     S->>F: 09:00 {"job": "forecast"}
@@ -76,7 +80,7 @@ Replay over every day since the auction moved to 15-minute products
 | `seasonal_naive_7d` | same slot, same weekday last week | 38.58 | 49.34 |
 
 Promoting a model means a reviewed PR that changes the `champion` Terraform
-variable, with `dayahead report` output as the evidence.
+variable, with `voltcast report` output as the evidence.
 
 ## Lineage
 
@@ -88,7 +92,7 @@ Any published number can be traced back to the exact bytes it came from.
 ## Repository
 
 ```text
-src/dayahead/
+src/voltcast/
   calendar.py   Berlin delivery days, 92/96/100 slots, gate closure
   smard.py      SMARD client (weekly chunks, no API key)
   contract.py   the data contract: missing waits, wrong stops
@@ -99,6 +103,7 @@ src/dayahead/
 tests/          41 tests, incl. both clock-change days and a real SMARD chunk
 infrastructure/ Terraform: S3+KMS, Lambda, Step Functions, Scheduler, alarms
 docs/
+  architecture.drawio  the diagram above (draw.io source)
   adr/          why things are the way they are
   runbook.md    what to do when an alarm fires
   incidents/    write-ups of every missed promise
@@ -111,7 +116,7 @@ make setup      # Python 3.13 venv + dev tools
 make test       # unit tests
 make backfill   # replay every day since 2025-10-01 from real SMARD data (~30 s)
 make report     # champion vs challenger
-.venv/bin/python -m dayahead forecast   # forecast the next open auction
+.venv/bin/python -m voltcast forecast   # forecast the next open auction
 ```
 
 State goes to `./data` (gitignored), laid out exactly as in the S3 bucket.
@@ -139,7 +144,7 @@ Berlin.
 
 ## Roadmap
 
-1. **Live baseline service.** Built; next step is deploying it.
+1. **Live baseline service.** Live since 2026-10-14 in eu-central-1; the first live forecast is for 16 Oct 2026.
 2. **Deploy from CI, public status page.** GitHub Actions deploys through OIDC (role
    in `aws-oidc-bootstrap`). A public page shows the latest forecast against the
    cleared price, rolling error and model version, plus a monthly report with the real AWS bill.
@@ -153,7 +158,7 @@ Berlin.
 ## Limitations
 
 - The baselines repeat recent prices. They will miss spikes and regime changes by design.
-- The numbers above are a replay, not a live record. The live record starts on deploy day
+- The numbers above are a replay, not a live record. The live record started on 2026-10-14
   and is reported separately (`live_days`).
 - One account, one region, one environment.
 

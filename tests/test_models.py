@@ -1,7 +1,7 @@
 from datetime import date, timedelta
 
-from dayahead.calendar import delivery_slots, wall_clock
-from dayahead.models import MODELS, seasonal_naive
+from voltcast.calendar import delivery_slots, wall_clock
+from voltcast.models import MODELS, seasonal_naive
 
 
 def history_for(day, price=lambda ts: float(wall_clock(ts)[0] * 100 + wall_clock(ts)[1])):

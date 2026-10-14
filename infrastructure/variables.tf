@@ -7,7 +7,7 @@ variable "aws_region" {
 variable "project" {
   description = "Name prefix for resources"
   type        = string
-  default     = "dayahead"
+  default     = "voltcast"
 }
 
 variable "code_version" {

@@ -23,7 +23,7 @@ provider "aws" {
   default_tags {
     tags = {
       project    = var.project
-      repository = "aws-mlops-predictive-maintenance"
+      repository = "voltcast"
       managed_by = "terraform"
     }
   }

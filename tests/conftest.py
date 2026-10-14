@@ -8,10 +8,10 @@ from datetime import date, datetime, time, timedelta
 
 import pytest
 
-from dayahead.calendar import BERLIN, delivery_slots, to_ms
-from dayahead.pipeline import Settings
-from dayahead.smard import BASE_URL, DAY_AHEAD_PRICE_DE_LU, SmardClient
-from dayahead.store import LocalStore
+from voltcast.calendar import BERLIN, delivery_slots, to_ms
+from voltcast.pipeline import Settings
+from voltcast.smard import BASE_URL, DAY_AHEAD_PRICE_DE_LU, SmardClient
+from voltcast.store import LocalStore
 
 SERIES = DAY_AHEAD_PRICE_DE_LU
 

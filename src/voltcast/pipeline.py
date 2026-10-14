@@ -15,12 +15,12 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 
-from dayahead import metrics
-from dayahead.calendar import BERLIN, berlin_today, delivery_slots, gate_closure, iso, local_date, parse_iso
-from dayahead.contract import InputsNotReady, TooLate, check_day, is_complete
-from dayahead.models import MODELS, Model
-from dayahead.smard import DAY_AHEAD_PRICE_DE_LU, Series, SmardClient, parse_points
-from dayahead.store import Store, keys
+from voltcast import metrics
+from voltcast.calendar import BERLIN, berlin_today, delivery_slots, gate_closure, iso, local_date, parse_iso
+from voltcast.contract import InputsNotReady, TooLate, check_day, is_complete
+from voltcast.models import MODELS, Model
+from voltcast.smard import DAY_AHEAD_PRICE_DE_LU, Series, SmardClient, parse_points
+from voltcast.store import Store, keys
 
 log = logging.getLogger(__name__)
 

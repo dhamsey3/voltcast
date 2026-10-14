@@ -1,7 +1,7 @@
 # Copy to backend.hcl (gitignored). Values come from the aws-oidc-bootstrap
 # outputs: one shared state bucket and lock table, one key per repo.
 bucket         = "dhamsey3-terraform-state-<ACCOUNT_ID>"
-key            = "aws-mlops-predictive-maintenance/terraform.tfstate"
+key            = "voltcast/terraform.tfstate"
 region         = "eu-central-1"
 dynamodb_table = "dhamsey3-terraform-locks"
 encrypt        = true

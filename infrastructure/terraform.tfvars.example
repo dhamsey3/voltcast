@@ -1,0 +1,7 @@
+# Copy to terraform.tfvars (gitignored) to override defaults.
+
+alert_email = "you@example.com"
+
+# Promotion: swap these in a reviewed PR once the evidence supports it.
+# champion    = "naive_1d"
+# challengers = ["seasonal_naive_7d"]

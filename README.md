@@ -28,7 +28,7 @@ notebook.
 | Every forecast is scored | same afternoon | `run-failed` alarm if scoring gives up |
 | Bad upstream data is never used | always | [data contract](docs/adr/0005-data-contract.md) stops the run |
 | No hindsight forecasts | always | live forecasts after the 12:00 gate closure are refused |
-| Cost | about 2 USD/month | AWS bill (estimate until deployed) |
+| Cost | about 2 USD/month | AWS bill (estimate until the first full month) |
 
 ## Architecture
 
@@ -144,7 +144,7 @@ Berlin.
 
 ## Roadmap
 
-1. **Live baseline service.** Built; next step is deploying it.
+1. **Live baseline service.** Live since 2026-10-14 in eu-central-1; the first live forecast is for 16 Oct 2026.
 2. **Deploy from CI, public status page.** GitHub Actions deploys through OIDC (role
    in `aws-oidc-bootstrap`). A public page shows the latest forecast against the
    cleared price, rolling error and model version, plus a monthly report with the real AWS bill.
@@ -158,7 +158,7 @@ Berlin.
 ## Limitations
 
 - The baselines repeat recent prices. They will miss spikes and regime changes by design.
-- The numbers above are a replay, not a live record. The live record starts on deploy day
+- The numbers above are a replay, not a live record. The live record started on 2026-10-14
   and is reported separately (`live_days`).
 - One account, one region, one environment.
 

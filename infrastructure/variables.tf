@@ -20,6 +20,8 @@ variable "alert_email" {
   description = "Where alarms go. Empty disables the email subscription."
   type        = string
   default     = ""
+  # The repo and its Actions logs are public; keep the address out of plans.
+  sensitive = true
 }
 
 # Promotion is a reviewed change to these two values - see docs/adr/0003.

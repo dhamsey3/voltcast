@@ -123,6 +123,21 @@ State goes to `./data` (gitignored), laid out exactly as in the S3 bucket.
 
 ## Deploy
 
+Merging to `main` deploys. The [deploy workflow](.github/workflows/deploy.yml)
+runs `make plan` on every pull request that touches the code or the
+infrastructure, and puts the plan in the run summary. On `main` it plans
+again and applies, stamping the Lambda with the merge commit's SHA. AWS
+access is GitHub OIDC with no stored keys. Pull requests get a read-only
+plan role, and only `main` can assume the apply role. Both roles live in
+`aws-oidc-bootstrap`, scoped to voltcast's own resources.
+
+The workflow reads the role ARNs, region, state bucket and lock table from
+repository variables, and the alert address from the `ALERT_EMAIL` secret.
+It refuses to run without that secret, because an empty address would
+delete the alert subscription.
+
+### By hand
+
 Prerequisites: the shared Terraform state bucket and lock table from
 `aws-oidc-bootstrap`, plus AWS credentials for the target account.
 
@@ -145,8 +160,8 @@ Berlin.
 ## Roadmap
 
 1. **Live baseline service.** Live since 2026-10-14 in eu-central-1; the first live forecast is for 16 Oct 2026.
-2. **Deploy from CI, public status page.** GitHub Actions deploys through OIDC (role
-   in `aws-oidc-bootstrap`). A public page shows the latest forecast against the
+2. **Deploy from CI, public status page.** GitHub Actions deploys through OIDC
+   ([Deploy](#deploy)). Still to come: a public page showing the latest forecast against the
    cleared price, rolling error and model version, plus a monthly report with the real AWS bill.
 3. **First learned model.** Features from ENTSO-E (load, wind and solar forecasts) and DWD
    weather. Trained on SageMaker and registered in the Model Registry with

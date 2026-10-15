@@ -1,0 +1,102 @@
+name: deploy
+
+# Plan on every pull request, apply on main. AWS access is GitHub OIDC, no
+# stored keys: pull requests get a read-only plan role, and only main can
+# assume the apply role (aws-oidc-bootstrap, role-voltcast.tf).
+
+on:
+  pull_request:
+    paths:
+      - src/**
+      - infrastructure/**
+      - requirements-lambda.txt
+      - Makefile
+      - .github/workflows/deploy.yml
+  push:
+    branches: [main]
+    paths:
+      - src/**
+      - infrastructure/**
+      - requirements-lambda.txt
+      - Makefile
+      - .github/workflows/deploy.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  terraform:
+    name: ${{ github.event_name == 'pull_request' && 'plan' || 'apply' }}
+    # Fork pull requests get no OIDC token; deploys only ever run from main.
+    if: >-
+      (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
+      || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-${{ github.event_name == 'pull_request' && github.ref || 'main' }}
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+    env:
+      IS_PR: ${{ github.event_name == 'pull_request' }}
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      TF_INPUT: "0"
+      TF_IN_AUTOMATION: "1"
+      TF_VAR_alert_email: ${{ secrets.ALERT_EMAIL }}
+      # The plan role can't write the lock table; a plan never needs it.
+      TF_CLI_ARGS_plan: ${{ github.event_name == 'pull_request' && '-lock=false' || '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+          terraform_wrapper: false
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ github.event_name == 'pull_request' && vars.AWS_PLAN_ROLE_ARN || vars.AWS_APPLY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Check alert email
+        # An empty alert_email would plan the alert subscription away.
+        run: |
+          if [ -z "$TF_VAR_alert_email" ]; then
+            echo "::error::The ALERT_EMAIL secret is not set; a deploy without it would delete the alert email subscription."
+            exit 1
+          fi
+
+      - name: Write backend config
+        env:
+          STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+          LOCK_TABLE: ${{ vars.TF_STATE_LOCK_TABLE }}
+        run: |
+          cat > infrastructure/backend.hcl <<EOF
+          bucket         = "$STATE_BUCKET"
+          key            = "voltcast/terraform.tfstate"
+          region         = "$AWS_REGION"
+          dynamodb_table = "$LOCK_TABLE"
+          encrypt        = true
+          EOF
+
+      - name: Plan
+        run: make plan PYTHON=python
+
+      - name: Summarise plan
+        run: |
+          terraform -chdir=infrastructure show -no-color tfplan > plan.txt
+          {
+            echo "### $(grep -E '^(Plan:|No changes)' plan.txt || echo 'Plan')"
+            echo
+            echo '<details><summary>Full plan</summary>'
+            echo
+            echo '```'
+            cat plan.txt
+            echo '```'
+            echo '</details>'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Apply
+        if: env.IS_PR != 'true'
+        run: make deploy

@@ -37,28 +37,15 @@ notebook.
 Source: [`docs/architecture.drawio`](docs/architecture.drawio), drawn with draw.io's
 AWS icon set. After editing it, run `make diagram` to re-export the image.
 
-## How a day runs
+### How a day runs (Berlin time)
 
-```mermaid
-sequenceDiagram
-    participant S as EventBridge Scheduler<br/>(Europe/Berlin)
-    participant F as Step Functions<br/>daily run
-    participant L as Lambda<br/>(voltcast)
-    participant D as SMARD
-    participant B as S3<br/>(versioned, KMS)
-    S->>F: 09:00 {"job": "forecast"}
-    F->>L: ingest
-    L->>D: weekly price chunks
-    L->>B: raw snapshot + curated days (contract-checked)
-    F->>L: forecast: champion + challengers
-    L->>B: forecasts/ and published/
-    Note over F,L: InputsNotReady → wait 15 min, re-ingest, retry
-    S->>L: 10:15 deadline check → ForecastMissing metric
-    Note over D: 12:00 auction closes · results ~14:00
-    S->>F: 14:30 {"job": "score"}
-    F->>L: ingest, then score
-    L->>B: scores/ + MAE metric per model
-```
+| Time | What happens |
+|---|---|
+| 09:00 | Scheduler starts a Step Functions run. Lambda pulls the latest prices from SMARD, checks them against the data contract, and saves a raw snapshot plus curated days to S3. It then forecasts the next open auction with the champion and every challenger, and publishes the champion. If upstream data is late, the run waits 15 minutes, re-ingests and retries. |
+| 10:15 | Deadline check: if tomorrow's forecast isn't published, the `forecast-missing` alarm emails on-call. |
+| 12:00 | The auction closes. Live forecasts for that day are refused from now on. |
+| ~14:00 | Cleared prices appear on SMARD. |
+| 14:30 | A second run ingests the cleared prices and scores every model's forecast. Error metrics go to CloudWatch. |
 
 Why it's built this way, rather than with a SageMaker endpoint and Model
 Monitor, is covered in [ADR 2](docs/adr/0002-daily-batch-not-endpoint.md) and

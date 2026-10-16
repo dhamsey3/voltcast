@@ -4,6 +4,7 @@
     python -m voltcast forecast --date 2026-10-16
     python -m voltcast backfill --start 2026-09-01 --end 2026-10-14
     python -m voltcast report --days 30
+    python -m voltcast status --out site --budget voltcast-monthly
 
 ``--store`` takes a local folder (default ./data) or s3://bucket.
 """
@@ -15,10 +16,13 @@ import json
 import logging
 import os
 from datetime import UTC, date, datetime, timedelta
+from pathlib import Path
 
 from voltcast.calendar import berlin_today, next_auction_day
+from voltcast.page import write_site
 from voltcast.pipeline import Settings, backfill, check_published, forecast, ingest, report, score
 from voltcast.smard import SmardClient
+from voltcast.status import collect, read_budget
 from voltcast.store import open_store
 
 
@@ -41,6 +45,9 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--end", type=date.fromisoformat, required=True)
     p = sub.add_parser("report", help="mean error per model")
     p.add_argument("--days", type=int, default=30)
+    p = sub.add_parser("status", help="build the public status page from live results")
+    p.add_argument("--out", type=Path, default=Path("site"))
+    p.add_argument("--budget", default="", help="AWS Budget to read the bill from (needs AWS credentials)")
 
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
@@ -67,6 +74,16 @@ def main(argv: list[str] | None = None) -> None:
             result = backfill(store, SmardClient(), args.start, args.end, settings)
         case "report":
             result = report(store, today - timedelta(days=args.days), today + timedelta(days=1))
+        case "status":
+            budget = None
+            if args.budget:
+                import boto3
+
+                account = boto3.client("sts").get_caller_identity()["Account"]
+                budget = read_budget(boto3.client("budgets", region_name="us-east-1"), account, args.budget, now)
+            status = collect(store, now, budget)
+            files = write_site(status, args.out)
+            result = {"wrote": [str(f) for f in files], "promise": status["promise"]["state"], "cost": bool(budget)}
 
     print(json.dumps(result, indent=2))
 

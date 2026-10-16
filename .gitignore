@@ -5,9 +5,10 @@ __pycache__/
 .ruff_cache/
 .DS_Store
 
-# local pipeline state and Lambda build output
+# local pipeline state, Lambda build output and status page builds
 data/
 build/
+site/
 
 # Terraform
 infrastructure/.terraform/

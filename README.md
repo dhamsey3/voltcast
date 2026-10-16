@@ -8,6 +8,11 @@ forecast before the auction closes at 12:00. That afternoon it grades itself
 against the cleared prices. It runs unattended on AWS, raises an alert when it
 misses a promise, and keeps the evidence behind every number it publishes.
 
+**[Live status page](https://dhamsey3.github.io/voltcast/)**: the latest forecast
+against the cleared price, the running error, what's deployed and the AWS bill.
+It's rebuilt twice a day from the service's own records, and the data behind it
+is at [`status.json`](https://dhamsey3.github.io/voltcast/status.json).
+
 ## Why this problem
 
 The day-ahead auction sets the price of every 15-minute slot of the next day.
@@ -28,7 +33,7 @@ notebook.
 | Every forecast is scored | same afternoon | `run-failed` alarm if scoring gives up |
 | Bad upstream data is never used | always | [data contract](docs/adr/0005-data-contract.md) stops the run |
 | No hindsight forecasts | always | live forecasts after the 12:00 gate closure are refused |
-| Cost | about 2 USD/month | AWS bill (estimate until the first full month) |
+| Cost | about 1 USD/month, alert above 5 | AWS Budget `voltcast-monthly` emails on-call on actual or forecast spend |
 
 ## Architecture
 
@@ -86,9 +91,11 @@ src/voltcast/
   models.py     champion/challenger models
   pipeline.py   ingest, forecast, score, check, backfill, report
   handler.py    Lambda entry point
-  __main__.py   CLI for local runs and backfills
-tests/          41 tests, incl. both clock-change days and a real SMARD chunk
-infrastructure/ Terraform: S3+KMS, Lambda, Step Functions, Scheduler, alarms
+  status.py     the status page's data: live record, promise, bill
+  page.py       the status page itself: one self-contained HTML file
+  __main__.py   CLI for local runs, backfills and the status page
+tests/          56 tests, incl. both clock-change days and a real SMARD chunk
+infrastructure/ Terraform: S3+KMS, Lambda, Step Functions, Scheduler, alarms, budget
 docs/
   architecture.drawio  the diagram above (draw.io source)
   adr/          why things are the way they are
@@ -104,6 +111,7 @@ make test       # unit tests
 make backfill   # replay every day since 2025-10-01 from real SMARD data (~30 s)
 make report     # champion vs challenger
 .venv/bin/python -m voltcast forecast   # forecast the next open auction
+.venv/bin/python -m voltcast status     # build the status page into ./site from live results
 ```
 
 State goes to `./data` (gitignored), laid out exactly as in the S3 bucket.
@@ -140,16 +148,19 @@ Berlin.
 
 ## Operating it
 
+- [Status page](https://dhamsey3.github.io/voltcast/): rebuilt by the
+  [status workflow](.github/workflows/status.yml) after the 10:15 deadline check and after
+  scoring, with a read-only role that sees only published results ([ADR 6](docs/adr/0006-status-page.md))
 - [Runbook](docs/runbook.md): what each alarm means and what to do
 - [Incidents](docs/incidents/README.md): every missed promise, written up
-- [Decisions](docs/adr/): ADRs 1 to 5
+- [Decisions](docs/adr/): ADRs 1 to 6
 
 ## Roadmap
 
 1. **Live baseline service.** Live since 2026-10-14 in eu-central-1; the first live forecast is for 16 Oct 2026.
 2. **Deploy from CI, public status page.** GitHub Actions deploys through OIDC
-   ([Deploy](#deploy)). Still to come: a public page showing the latest forecast against the
-   cleared price, rolling error and model version, plus a monthly report with the real AWS bill.
+   ([Deploy](#deploy)), and the [status page](https://dhamsey3.github.io/voltcast/) shows the
+   latest forecast against the cleared price, the running error, the deployed model and the AWS bill.
 3. **First learned model.** Features from ENTSO-E (load, wind and solar forecasts) and DWD
    weather. Trained on SageMaker and registered in the Model Registry with
    lineage. The approval gate: beat the champion over 30 days in shadow.

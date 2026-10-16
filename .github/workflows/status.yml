@@ -1,0 +1,68 @@
+name: status
+
+# Rebuilds the public status page on GitHub Pages from the live records in S3
+# and the monthly AWS Budget. It runs after the 10:15 deadline check and after
+# the 14:30 scoring run (Berlin; the cron times are UTC and land after both in
+# summer and winter time), and whenever the page code changes on main.
+# GitHub pauses scheduled workflows after 60 days without commits; a manual
+# run (workflow_dispatch) starts them again.
+
+on:
+  schedule:
+    - cron: "30 9 * * *"
+    - cron: "15 14 * * *"
+  push:
+    branches: [main]
+    paths:
+      - src/voltcast/status.py
+      - src/voltcast/page.py
+      - .github/workflows/status.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: status-page
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+      - run: pip install -r requirements-dev.txt -e .
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          # Read-only and trusted from main only (aws-oidc-bootstrap, role-voltcast.tf).
+          role-to-assume: ${{ vars.AWS_STATUS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - name: Build the page
+        run: |
+          # The data bucket is named voltcast-data-<account> (infrastructure/storage.tf).
+          account=$(aws sts get-caller-identity --query Account --output text)
+          python -m voltcast --store "s3://voltcast-data-$account" status --out site --budget voltcast-monthly
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

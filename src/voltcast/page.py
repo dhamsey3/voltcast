@@ -146,8 +146,12 @@ def _chart(
                     svg.append(f'<path class="ring" d="{dot}"/><path class="dot s{s["slot"]}" d="{dot}"/>')
 
     y_labels = "".join(f'<span class="ylab" style="top:{top(t)}">{_num(t, 0)}</span>' for t in ticks)
+    # Every other inner tick is "minor": a narrow chart hides those (CSS) so
+    # the remaining labels never overlap.
     x_labels_html = "".join(
-        f'<span class="xlab" style="left:{left(x(i) if not step else i)}">{_e(label)}</span>' for i, label in x_ticks
+        f'<span class="xlab{" minor" if 0 < k < len(x_ticks) - 1 and k % 2 else ""}"'
+        f' style="left:{left(x(i) if not step else i)}">{_e(label)}</span>'
+        for k, (i, label) in enumerate(x_ticks)
     )
 
     # Direct labels at the line ends, unless two would collide: then the
@@ -569,7 +573,7 @@ section { background: var(--surface); border: 1px solid var(--border); border-ra
 .status-good path, .status-critical path { stroke: #fff; } .status-pending path { stroke: var(--pending); }
 .meter { margin-top: 10px; height: 6px; border-radius: 3px; background: var(--meter-track); overflow: hidden; }
 .meter span { display: block; height: 100%; min-width: 3px; border-radius: 3px; background: var(--meter); }
-.chart { margin: 0; }
+.chart { margin: 0; container-type: inline-size; }
 .chart figcaption { margin-bottom: 8px; }
 .legend { list-style: none; display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0 0 8px; padding: 0;
   font-size: 0.875rem; color: var(--ink-2); }
@@ -594,11 +598,11 @@ section { background: var(--surface); border: 1px solid var(--border); border-ra
 .crosshair { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--axis); pointer-events: none; }
 .tip { position: absolute; top: 0; z-index: 2; min-width: 150px; padding: 8px 10px; border-radius: 8px;
   background: var(--surface); border: 1px solid var(--border); box-shadow: 0 4px 16px rgba(0,0,0,0.12);
-  font-size: 0.8125rem; pointer-events: none; }
+  font-size: 0.8125rem; pointer-events: none; max-width: 100cqw; }
 .tip-head { color: var(--ink-2); margin-bottom: 4px; }
-.tip-row { display: flex; align-items: center; gap: 8px; }
+.tip-row { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
 .tip-row strong { font-variant-numeric: tabular-nums; }
-.tip-name { color: var(--ink-2); }
+.tip-name { color: var(--ink-2); min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .s1 { stroke: var(--s1); } .s2 { stroke: var(--s2); } .s3 { stroke: var(--s3); } .s4 { stroke: var(--s4); }
 .s5 { stroke: var(--s5); } .s6 { stroke: var(--s6); } .s7 { stroke: var(--s7); } .s8 { stroke: var(--s8); }
 .key.s1 { background: var(--s1); } .key.s2 { background: var(--s2); } .key.s3 { background: var(--s3); }
@@ -627,8 +631,17 @@ footer { margin-top: 24px; color: var(--ink-2); font-size: 0.8125rem; }
 footer p { margin: 4px 0; }
 @media (max-width: 560px) {
   section { padding: 16px; }
-  .frame { padding-right: 72px; }
   .facts div { grid-template-columns: 1fr; gap: 0; }
+}
+/* Sized by each chart's own width, not the screen's. On phones the end
+   labels go (the legend and read-out still name every line) and the plot
+   takes their room; on very narrow charts every other x label goes too. */
+@container (max-width: 480px) {
+  .frame { padding-right: 12px; }
+  .end { display: none; }
+}
+@container (max-width: 300px) {
+  .xlab.minor { display: none; }
 }
 @media (forced-colors: active) {
   .plot .line, .plot .dot { stroke: CanvasText; }
@@ -641,6 +654,7 @@ SCRIPT = """
   document.querySelectorAll("figure.chart").forEach((fig) => {
     const data = JSON.parse(fig.querySelector(".chart-data").textContent);
     const plot = fig.querySelector(".plot");
+    const frame = fig.querySelector(".frame");
     const line = fig.querySelector(".crosshair");
     const tip = fig.querySelector(".tip");
     const n = data.x.length;
@@ -671,9 +685,15 @@ SCRIPT = """
         return row;
       });
       tip.replaceChildren(head, ...rows);
-      const flip = x > 55;
-      tip.style.left = flip ? "" : "calc(" + x + "% + 12px)";
-      tip.style.right = flip ? "calc(" + (100 - x) + "% + 12px)" : "";
+      // Beside the crosshair, on whichever side fits, and never past the
+      // chart's frame: on a phone the read-out can be wider than the plot.
+      const pr = plot.getBoundingClientRect();
+      const fr = frame.getBoundingClientRect();
+      const at = (x / 100) * pr.width;
+      const w = tip.offsetWidth;
+      let left = at + 12 + w <= fr.right - pr.left ? at + 12 : at - 12 - w;
+      left = Math.max(fr.left - pr.left, Math.min(left, fr.right - pr.left - w));
+      tip.style.left = left + "px";
     }
     function hide() {
       line.hidden = true;

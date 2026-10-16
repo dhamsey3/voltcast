@@ -79,6 +79,8 @@ def test_page_renders_charts_tables_and_escapes_text(live_store):
     page = render(status)
     assert page.count('<figure class="chart"') == 3  # last scored day, next forecast, daily error
     assert "Cleared price" in page and "Forecast (naive_1d)" in page
+    # Narrow charts hide the 06:00 and 18:00 ticks (CSS), keeping 00:00, 12:00 and 24:00.
+    assert re.findall(r'<span class="xlab minor"[^>]*>([^<]+)<', page)[:2] == ["06:00", "18:00"]
     assert "<script>alert(1)</script>" not in page
     assert "&lt;script&gt;alert(1)&lt;/script&gt;" in page
     # One table row per quarter-hour behind the price charts, so values never depend on hover.

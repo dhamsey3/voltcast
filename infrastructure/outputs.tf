@@ -15,3 +15,8 @@ output "lambda_function" {
 output "alerts_topic_arn" {
   value = aws_sns_topic.alerts.arn
 }
+
+output "budget_name" {
+  description = "Read by the status page for its bill section"
+  value       = aws_budgets_budget.monthly.name
+}

@@ -24,6 +24,12 @@ variable "alert_email" {
   sensitive = true
 }
 
+variable "monthly_budget_usd" {
+  description = "Monthly AWS spend that alerts on-call, on actual or forecast spend (budget.tf)"
+  type        = number
+  default     = 5
+}
+
 # Promotion is a reviewed change to these two values - see docs/adr/0003.
 variable "champion" {
   description = "Model whose forecast is published"

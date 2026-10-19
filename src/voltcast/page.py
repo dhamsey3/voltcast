@@ -507,7 +507,7 @@ def render(status: dict) -> str:
   <h1>Tomorrow's German power prices, forecast and graded every day</h1>
   <p class="lede">Each morning voltcast publishes a price for every quarter-hour of tomorrow's {_e(status["region"])}
   day-ahead auction, before bidding closes at 12:00. That afternoon it scores itself against the prices that cleared.
-  This page is rebuilt from the service's own records twice a day.</p>
+  This page is rebuilt from the service's own records every hour during the day.</p>
   <p class="meta">Updated {_e(_when(status["generated_at"]))} · <a href="status.json">status.json</a> ·
   <a href="{REPO_URL}">Source and design</a></p>
 </header>

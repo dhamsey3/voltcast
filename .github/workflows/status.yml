@@ -1,16 +1,22 @@
 name: status
 
 # Rebuilds the public status page on GitHub Pages from the live records in S3
-# and the monthly AWS Budget. It runs after the 10:15 deadline check and after
-# the 14:30 scoring run (Berlin; the cron times are UTC and land after both in
-# summer and winter time), and whenever the page code changes on main.
+# and the monthly AWS Budget, and whenever the page code changes on main.
+#
+# Hourly from 07:17 to 18:17 UTC. That covers the 09:00 forecast, the 10:15
+# deadline and the 14:30 scoring run (Berlin), including scoring's up to 3
+# hours of waiting for late prices, in summer and winter time. GitHub often
+# starts scheduled runs hours late, so with one run an hour a late start
+# costs about an hour of staleness instead of half a day. Minute 17 avoids
+# the busy top of the hour. Each build is a handful of S3 reads and a free
+# Budgets API call, and Actions minutes are free on a public repo.
+#
 # GitHub pauses scheduled workflows after 60 days without commits; a manual
 # run (workflow_dispatch) starts them again.
 
 on:
   schedule:
-    - cron: "30 9 * * *"
-    - cron: "15 14 * * *"
+    - cron: "17 7-18 * * *"
   push:
     branches: [main]
     paths:

@@ -43,3 +43,12 @@ the whole service runs at about 1 USD a month.
   run starts them again.
 - Only live forecasts appear. The backfill replay stays in `voltcast report`
   and the README, so the live record is never mixed with hindsight.
+
+## Update, 2026-10-19: hourly rebuilds
+
+In the first days live, GitHub started the two scheduled runs 3 to 4 hours
+late (09:30 UTC ran at about 13:20, 14:15 at about 17:20). For most of each
+morning the page didn't show that day's forecast. The workflow now runs
+hourly from 07:17 to 18:17 UTC, so a late start costs about an hour. The
+extra runs are free: a handful of S3 reads, a free Budgets API call, and
+free Actions minutes on a public repo.

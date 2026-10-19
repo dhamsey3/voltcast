@@ -10,7 +10,7 @@ misses a promise, and keeps the evidence behind every number it publishes.
 
 **[Live status page](https://dhamsey3.github.io/voltcast/)**: the latest forecast
 against the cleared price, the running error, what's deployed and the AWS bill.
-It's rebuilt twice a day from the service's own records, and the data behind it
+It's rebuilt hourly during the day from the service's own records, and the data behind it
 is at [`status.json`](https://dhamsey3.github.io/voltcast/status.json).
 
 ## Why this problem
@@ -149,8 +149,8 @@ Berlin.
 ## Operating it
 
 - [Status page](https://dhamsey3.github.io/voltcast/): rebuilt by the
-  [status workflow](.github/workflows/status.yml) after the 10:15 deadline check and after
-  scoring, with a read-only role that sees only published results ([ADR 6](docs/adr/0006-status-page.md))
+  [status workflow](.github/workflows/status.yml) hourly from 07:17 to 18:17 UTC, with a
+  read-only role that sees only published results ([ADR 6](docs/adr/0006-status-page.md))
 - [Runbook](docs/runbook.md): what each alarm means and what to do
 - [Incidents](docs/incidents/README.md): every missed promise, written up
 - [Decisions](docs/adr/): ADRs 1 to 6

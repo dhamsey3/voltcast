@@ -67,3 +67,22 @@ variable "upstream_wait_attempts" {
   type        = number
   default     = 12
 }
+
+# The status page rebuild (status_trigger.tf).
+variable "status_refresh_schedule" {
+  description = "When the page is rebuilt to show the deadline check's verdict"
+  type        = string
+  default     = "cron(20 10 * * ? *)"
+}
+
+variable "status_token_parameter" {
+  description = "SSM SecureString holding a GitHub token that may dispatch the status workflow"
+  type        = string
+  default     = "/voltcast/github-dispatch-token"
+}
+
+variable "github_repository" {
+  description = "owner/name of the repo whose status workflow builds the page"
+  type        = string
+  default     = "dhamsey3/voltcast"
+}

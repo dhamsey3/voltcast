@@ -10,7 +10,7 @@ misses a promise, and keeps the evidence behind every number it publishes.
 
 **[Live status page](https://dhamsey3.github.io/voltcast/)**: the latest forecast
 against the cleared price, the running error, what's deployed and the AWS bill.
-It's rebuilt hourly during the day from the service's own records, and the data behind it
+It's rebuilt from the service's own records whenever a run finishes, and the data behind it
 is at [`status.json`](https://dhamsey3.github.io/voltcast/status.json).
 
 ## Why this problem
@@ -93,9 +93,10 @@ src/voltcast/
   handler.py    Lambda entry point
   status.py     the status page's data: live record, promise, bill
   page.py       the status page itself: one self-contained HTML file
+  trigger.py    asks GitHub to rebuild the status page when a run finishes
   __main__.py   CLI for local runs, backfills and the status page
-tests/          56 tests, incl. both clock-change days and a real SMARD chunk
-infrastructure/ Terraform: S3+KMS, Lambda, Step Functions, Scheduler, alarms, budget
+tests/          59 tests, incl. both clock-change days and a real SMARD chunk
+infrastructure/ Terraform: S3+KMS, Lambda, Step Functions, Scheduler, EventBridge, alarms, budget
 docs/
   architecture.drawio  the diagram above (draw.io source)
   adr/          why things are the way they are
@@ -149,8 +150,8 @@ Berlin.
 ## Operating it
 
 - [Status page](https://dhamsey3.github.io/voltcast/): rebuilt by the
-  [status workflow](.github/workflows/status.yml) hourly from 07:17 to 18:17 UTC, with a
-  read-only role that sees only published results ([ADR 6](docs/adr/0006-status-page.md))
+  [status workflow](.github/workflows/status.yml) whenever a daily run finishes, started from
+  AWS, with a read-only role that sees only published results ([ADR 6](docs/adr/0006-status-page.md))
 - [Runbook](docs/runbook.md): what each alarm means and what to do
 - [Incidents](docs/incidents/README.md): every missed promise, written up
 - [Decisions](docs/adr/): ADRs 1 to 6

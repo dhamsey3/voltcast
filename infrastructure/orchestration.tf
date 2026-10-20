@@ -144,7 +144,11 @@ resource "aws_iam_role_policy" "scheduler" {
     Version = "2012-10-17"
     Statement = [
       { Effect = "Allow", Action = "states:StartExecution", Resource = aws_sfn_state_machine.daily.arn },
-      { Effect = "Allow", Action = "lambda:InvokeFunction", Resource = aws_lambda_function.pipeline.arn },
+      {
+        Effect   = "Allow"
+        Action   = "lambda:InvokeFunction"
+        Resource = [aws_lambda_function.pipeline.arn, aws_lambda_function.status_trigger.arn]
+      },
     ]
   })
 }

@@ -52,3 +52,21 @@ morning the page didn't show that day's forecast. The workflow now runs
 hourly from 07:17 to 18:17 UTC, so a late start costs about an hour. The
 extra runs are free: a handful of S3 reads, a free Budgets API call, and
 free Actions minutes on a public repo.
+
+## Update, 2026-10-20: the pipeline starts the rebuild
+
+Hourly schedules didn't help: in its first day GitHub started 2 of the
+roughly 17 scheduled runs, hours late. The page no longer depends on GitHub's
+scheduler. When a daily run finishes, and once after the 10:15 deadline check,
+a small Lambda (`voltcast-status-trigger`, same code bundle) asks GitHub to run
+the workflow through its API. A daily schedule stays as a fallback.
+
+- The token is a fine-grained GitHub token limited to this repo's Actions,
+  kept in an SSM SecureString that is created by hand. It never passes through
+  Terraform state, CI or the repo. SSM standard parameters are free. An
+  EventBridge API destination would have needed a Secrets Manager secret
+  (0.40 USD a month, about a third of the bill).
+- A failed dispatch fails the Lambda and raises `status-trigger-failed`, so an
+  expired token shows up as an email instead of a quietly stale page.
+- The pipeline Lambda doesn't know the page exists: the trigger reacts to Step
+  Functions events.

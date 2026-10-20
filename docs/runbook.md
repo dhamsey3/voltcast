@@ -8,6 +8,7 @@ Results usually appear on SMARD around 14:00.
 | 09:00 | daily run `{"job":"forecast"}`: ingest, then forecast the next open auction |
 | 10:15 | deadline check: is tomorrow's forecast published? |
 | 14:30 | daily run `{"job":"score"}`: ingest, then score tomorrow's forecasts |
+| after each run, 10:20 | the status page is rebuilt (`voltcast-status-trigger` asks GitHub to run the status workflow) |
 
 ## run-failed
 
@@ -31,6 +32,39 @@ the auction closes.
 1. Is a forecast run still waiting for data? Check the executions list. If so, it will keep trying until 12:00.
 2. If no run is going, start one (below).
 3. If it can't be published before 12:00, record an incident. Don't publish afterwards (`TooLate` won't let you).
+
+## status-trigger-failed
+
+GitHub refused to start the status workflow, so the status page is going
+stale. The forecasts themselves are fine. Read the error in the
+`/aws/lambda/voltcast-status-trigger` log group.
+
+| Error | What it means | Do this |
+|---|---|---|
+| HTTP 401 | the token expired or was revoked | Create a new token and store it (below). |
+| HTTP 403 or 404 | the token can't run workflows on this repo | Check its repository access and its Actions permission. |
+| `ParameterNotFound` | the token was never stored | Store it (below). |
+| HTTP 5xx | GitHub is having trouble | Nothing; the next trigger or the daily fallback catches up. |
+
+### The dispatch token
+
+The trigger needs a GitHub **fine-grained personal access token** with access
+to `dhamsey3/voltcast` only and one permission: **Actions: Read and write**.
+Give it an expiry and put a reminder in your calendar a week before it.
+Store it in SSM yourself; it never goes through Terraform, CI or chat. `read
+-rs` keeps it out of your shell history:
+
+```bash
+read -rs TOKEN && aws ssm put-parameter --profile awslab --region eu-central-1 \
+  --name /voltcast/github-dispatch-token --type SecureString --overwrite --value "$TOKEN"; unset TOKEN
+```
+
+Check it end to end. This rebuilds the page, nothing else:
+
+```bash
+aws lambda invoke --profile awslab --region eu-central-1 --function-name voltcast-status-trigger \
+  --payload '{"reason":"manual"}' out.json && cat out.json
+```
 
 ## Manual actions
 
